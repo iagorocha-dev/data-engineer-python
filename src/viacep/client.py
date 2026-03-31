@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from src.viacep.models import Address
+from src.viacep.utils import is_viacep_not_found
 
 
 class ViaCepClient:
@@ -37,7 +38,7 @@ class ViaCepClient:
 
             data = response.json()
 
-            if data.get("erro") is True:
+            if is_viacep_not_found(data):
                 return None, {
                     "cep": cep,
                     "error_type": "not_found",
