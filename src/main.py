@@ -1,4 +1,5 @@
 import asyncio
+import time
 
 from src.config import Settings
 from src.io.cep_reader import load_ceps
@@ -11,6 +12,8 @@ def main() -> None:
     valid_ceps, invalid_rows = load_ceps(str(settings.input_csv))
     sample_ceps = valid_ceps[:500]
 
+    start = time.perf_counter()
+
     addresses, errors = asyncio.run(
         fetch_all_ceps(
             sample_ceps,
@@ -22,11 +25,14 @@ def main() -> None:
         )
     )
 
+    elapsed = time.perf_counter() - start
+
     print(f"Total de CEPs válidos carregados: {len(valid_ceps)}")
     print(f"Total de CEPs inválidos carregados: {len(invalid_rows)}")
     print(f"Total processado na amostra: {len(sample_ceps)}")
     print(f"Sucessos: {len(addresses)}")
     print(f"Erros: {len(errors)}")
+    print(f"Tempo total: {elapsed:.2f}s")
 
     if addresses:
         print(
