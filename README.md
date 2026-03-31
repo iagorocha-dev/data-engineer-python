@@ -34,3 +34,10 @@ pip install -r requirements.txt
 ```bash
 python -m src.main
 ```
+
+## Geração do arquivo de entrada
+
+Para gerar o CSV com 10.000 CEPs:
+
+```bash
+python -m src.io.generate_ceps
