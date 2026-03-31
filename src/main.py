@@ -9,7 +9,7 @@ def main() -> None:
     settings = Settings()
 
     valid_ceps, invalid_rows = load_ceps(str(settings.input_csv))
-    sample_ceps = valid_ceps[:100]
+    sample_ceps = valid_ceps[:500]
 
     addresses, errors = asyncio.run(
         fetch_all_ceps(
