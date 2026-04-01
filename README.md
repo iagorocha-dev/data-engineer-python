@@ -67,7 +67,8 @@ Após a execução, os seguintes arquivos serão gerados em `data/output/`:
 
 - errors.csv → Relatório de erros de validação e consulta
 - ceps.db → Banco SQLite contendo os endereços processados com sucesso
-
+- addresses.json → Arquivo JSON contendo os endereços processados com sucesso
+- addresses.xml → Arquivo XML contendo os endereços processados com sucesso
 
 ## 🏗️ Arquitetura (visão geral)
 
@@ -77,23 +78,64 @@ O projeto segue separação de responsabilidades:
 - db/ → persistência em banco de dados
 - config.py → configurações da aplicação
 - main.py → orquestração do pipeline
+- utils/logging.py → configuração de logs
 
 ## ⚙️ Configurações
 
 As configurações do projeto estão definidas no arquivo `src/config.py`:
 
-Exemplos:
-- max_concurrency
-- request_timeout_seconds
-- max_retries
-- database_url
+Exemplo .env:
 
+```env
+DATABASE_URL=sqlite:///data/output/ceps.db
+VIACEP_BASE_URL=https://viacep.com.br/ws
+REQUEST_TIMEOUT_SECONDS=8
+MAX_CONCURRENCY=3
+MAX_RETRIES=2
+REQUESTS_PER_SECOND=3
+BATCH_PAUSE_SECONDS=1.0
+BATCH_SIZE=5
+LOG_LEVEL=INFO
+```
+
+## 🚦 Controle de concorrência e taxa
+
+Para evitar sobrecarga da API ViaCEP, o pipeline aplica múltiplas estratégias:
+
+- Limite de concorrência (Semaphore)
+- Controle de taxa de requisições por segundo (rate limiter)
+- Execução em batches
+- Pausa entre batches
+- Retry com backoff exponencial
+
+Essas estratégias garantem um consumo mais estável e reduzem o risco de bloqueio por IP.
+
+## 🪵 Logging
+
+O projeto utiliza o módulo padrão logging do Python.
+
+Níveis disponíveis:
+- INFO → visão geral da execução (batches)
+- DEBUG → detalhamento completo (rate limiting, requisições, retries)
+
+Executar com debug:
+```bash
+LOG_LEVEL=DEBUG python -m src.main
+```
 
 ## 📝 Observações
 
-- O processamento utiliza concorrência controlada para evitar sobrecarga da API ViaCEP
-- Durante os testes, foi observado bloqueio temporário ao realizar muitas requisições sem controle de concorrência, reforçando a importância do rate limiting
 - CEPs são validados em duas etapas:
   - formato (validação local)
   - existência (via API)
 - CEPs inexistentes são registrados como erro (not_found)
+- O processamento utiliza concorrência controlada para evitar sobrecarga da API ViaCEP
+- Durante os testes, foi observado bloqueio temporário ao realizar muitas requisições sem controle de concorrência, reforçando a importância do rate limiting
+- O uso de rate limiting e controle de concorrência resolve esse problema de forma segura
+
+
+## 🔧 Possíveis melhorias
+- Migração para PostgreSQL em ambiente produtivo
+- Observabilidade (logs estruturados + métricas)
+- Execução distribuída (fila / workers)
+- Cache de CEPs já consultados

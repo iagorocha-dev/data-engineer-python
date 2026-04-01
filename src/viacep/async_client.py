@@ -1,12 +1,17 @@
 from __future__ import annotations
 
 import asyncio
+import logging
+import time
+from collections import deque
 from typing import Any
 
 import httpx
 
 from src.viacep.models import Address
 from src.viacep.utils import is_viacep_not_found
+
+logger = logging.getLogger(__name__)
 
 
 def calculate_backoff(attempt: int) -> float:
@@ -15,6 +20,55 @@ def calculate_backoff(attempt: int) -> float:
     Estratégia simples de backoff exponencial.
     """
     return 0.3 * (2 ** attempt)
+
+
+class AsyncRateLimiter:
+    """
+    Rate limiter simples por janela deslizante.
+
+    Exemplo:
+    - max_calls=3
+    - period_seconds=1.0
+
+    Garante no máximo 3 liberações por segundo.
+    """
+
+    def __init__(self, max_calls: int, period_seconds: float = 1.0):
+        self.max_calls = max_calls
+        self.period_seconds = period_seconds
+        self.calls: deque[float] = deque()
+        self._lock = asyncio.Lock()
+
+    async def acquire(self) -> None:
+        async with self._lock:
+            now = time.monotonic()
+
+            while self.calls and now - self.calls[0] >= self.period_seconds:
+                self.calls.popleft()
+
+            if len(self.calls) >= self.max_calls:
+                sleep_for = self.period_seconds - (now - self.calls[0])
+
+                if sleep_for > 0:
+                    logger.debug(
+                        "Rate limit atingido; aguardando %.3fs | window_calls=%s/%s",
+                        sleep_for,
+                        len(self.calls),
+                        self.max_calls,
+                    )
+                    await asyncio.sleep(sleep_for)
+
+                now = time.monotonic()
+                while self.calls and now - self.calls[0] >= self.period_seconds:
+                    self.calls.popleft()
+
+            self.calls.append(time.monotonic())
+
+            logger.debug(
+                "Rate limit liberado | window_calls=%s/%s",
+                len(self.calls),
+                self.max_calls,
+            )
 
 
 class AsyncViaCepClient:
@@ -37,9 +91,19 @@ class AsyncViaCepClient:
         for attempt in range(self.max_retries + 1):
             try:
                 response = await client.get(url, timeout=self.timeout_seconds)
+
                 if response.status_code in (429, 500, 502, 503, 504):
                     if attempt < self.max_retries:
-                        await asyncio.sleep(calculate_backoff(attempt))
+                        backoff = calculate_backoff(attempt)
+                        logger.warning(
+                            "Retry por status HTTP | cep=%s | status=%s | tentativa=%s/%s | sleep=%.2fs",
+                            cep,
+                            response.status_code,
+                            attempt + 1,
+                            self.max_retries,
+                            backoff,
+                        )
+                        await asyncio.sleep(backoff)
                         continue
 
                     return None, {
@@ -56,6 +120,7 @@ class AsyncViaCepClient:
                         "status_code": response.status_code,
                         "message": f"HTTP {response.status_code} ao consultar ViaCEP",
                     }
+
                 data = response.json()
 
                 if is_viacep_not_found(data):
@@ -87,7 +152,16 @@ class AsyncViaCepClient:
 
             except (httpx.TimeoutException, httpx.NetworkError) as exc:
                 if attempt < self.max_retries:
-                    await asyncio.sleep(calculate_backoff(attempt))
+                    backoff = calculate_backoff(attempt)
+                    logger.warning(
+                        "Retry por timeout/rede | cep=%s | tentativa=%s/%s | sleep=%.2fs | detalhe=%s",
+                        cep,
+                        attempt + 1,
+                        self.max_retries,
+                        backoff,
+                        exc,
+                    )
+                    await asyncio.sleep(backoff)
                     continue
 
                 return None, {
@@ -128,13 +202,25 @@ async def fetch_all_ceps(
     timeout_seconds: float,
     max_concurrency: int,
     max_retries: int,
-    batch_size: int = 200,
+    batch_size: int = 5,
+    requests_per_second: int = 3,
+    batch_pause_seconds: float = 1.0,
 ) -> tuple[list[Address], list[dict[str, Any]]]:
     """
     Processa CEPs em paralelo de forma controlada.
+
+    Controles aplicados:
+    - concorrência máxima (semaphore)
+    - taxa máxima por segundo (rate limiter)
+    - pausa entre batches
     """
 
     semaphore = asyncio.Semaphore(max_concurrency)
+    rate_limiter = AsyncRateLimiter(
+        max_calls=requests_per_second,
+        period_seconds=1.0,
+    )
+
     via_cep_client = AsyncViaCepClient(
         base_url=base_url,
         timeout_seconds=timeout_seconds,
@@ -148,17 +234,48 @@ async def fetch_all_ceps(
 
         async def worker(cep: str) -> tuple[Address | None, dict[str, Any] | None]:
             async with semaphore:
+                await rate_limiter.acquire()
+                logger.debug("Disparando requisição | cep=%s", cep)
                 return await via_cep_client.fetch(http_client, cep)
 
-        for start in range(0, len(ceps), batch_size):
+        total_batches = (len(ceps) + batch_size - 1) // batch_size
+
+        for batch_index, start in enumerate(range(0, len(ceps), batch_size), start=1):
             batch = ceps[start : start + batch_size]
 
+            logger.info(
+                "Iniciando batch %s/%s | size=%s",
+                batch_index,
+                total_batches,
+                len(batch),
+            )
+
             results = await asyncio.gather(*(worker(cep) for cep in batch))
+
+            batch_success = 0
+            batch_errors = 0
 
             for address, error in results:
                 if address is not None:
                     addresses.append(address)
+                    batch_success += 1
                 if error is not None:
                     errors.append(error)
+                    batch_errors += 1
+
+            logger.info(
+                "Finalizando batch %s/%s | success=%s | errors=%s",
+                batch_index,
+                total_batches,
+                batch_success,
+                batch_errors,
+            )
+
+            if batch_index < total_batches:
+                logger.debug(
+                    "Pausa entre batches | sleep=%.2fs",
+                    batch_pause_seconds,
+                )
+                await asyncio.sleep(batch_pause_seconds)
 
     return addresses, errors
