@@ -2,6 +2,8 @@ import asyncio
 import time
 
 from src.config import Settings
+from src.db.repository import save_addresses
+from src.db.session import create_session_factory
 from src.io.cep_reader import load_ceps
 from src.io.writers import write_errors_csv
 from src.viacep.async_client import fetch_all_ceps
@@ -30,6 +32,12 @@ def main() -> None:
 
     all_errors = invalid_rows + api_errors
 
+    # Persistência em banco
+    session_factory = create_session_factory(settings.database_url)
+    with session_factory() as session:
+        save_addresses(session, addresses)
+
+    # Relatório de erros
     errors_output_path = settings.output_dir / "errors.csv"
     write_errors_csv(errors_output_path, all_errors)
 
@@ -40,6 +48,7 @@ def main() -> None:
     print(f"Erros: {len(all_errors)}")
     print(f"Tempo total: {elapsed:.2f}s")
     print(f"Arquivo de erros gerado em: {errors_output_path}")
+    print(f"Banco utilizado: {settings.database_url}")
 
     if addresses:
         print(
