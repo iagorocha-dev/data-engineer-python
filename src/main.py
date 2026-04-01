@@ -3,6 +3,7 @@ import time
 
 from src.config import Settings
 from src.io.cep_reader import load_ceps
+from src.io.writers import write_errors_csv
 from src.viacep.async_client import fetch_all_ceps
 
 
@@ -14,7 +15,7 @@ def main() -> None:
 
     start = time.perf_counter()
 
-    addresses, errors = asyncio.run(
+    addresses, api_errors = asyncio.run(
         fetch_all_ceps(
             sample_ceps,
             base_url=settings.viacep_base_url,
@@ -27,12 +28,18 @@ def main() -> None:
 
     elapsed = time.perf_counter() - start
 
+    all_errors = invalid_rows + api_errors
+
+    errors_output_path = settings.output_dir / "errors.csv"
+    write_errors_csv(errors_output_path, all_errors)
+
     print(f"Total de CEPs válidos carregados: {len(valid_ceps)}")
     print(f"Total de CEPs inválidos carregados: {len(invalid_rows)}")
     print(f"Total processado na amostra: {len(sample_ceps)}")
     print(f"Sucessos: {len(addresses)}")
-    print(f"Erros: {len(errors)}")
+    print(f"Erros: {len(all_errors)}")
     print(f"Tempo total: {elapsed:.2f}s")
+    print(f"Arquivo de erros gerado em: {errors_output_path}")
 
     if addresses:
         print(
@@ -40,8 +47,8 @@ def main() -> None:
             f"Localidade={addresses[0].localidade} | UF={addresses[0].uf}"
         )
 
-    if errors:
-        print(f"Exemplo de erro: {errors[0]}")
+    if all_errors:
+        print(f"Exemplo de erro: {all_errors[0]}")
 
 
 if __name__ == "__main__":
