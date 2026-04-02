@@ -1,4 +1,5 @@
 import asyncio
+import logging
 import time
 
 from src.config import Settings
@@ -9,6 +10,8 @@ from src.io.exporters import export_to_json, export_to_xml
 from src.io.writers import write_errors_csv
 from src.utils.logging import setup_logging
 from src.viacep.async_client import fetch_all_ceps
+
+logger = logging.getLogger(__name__)
 
 
 def main() -> None:
@@ -48,25 +51,27 @@ def main() -> None:
     export_to_json(json_path, addresses)
     export_to_xml(xml_path, addresses)
 
-    print(f"Total de CEPs válidos carregados: {len(valid_ceps)}")
-    print(f"Total de CEPs inválidos carregados: {len(invalid_rows)}")
-    print(f"Total processado na amostra: {len(sample_ceps)}")
-    print(f"Sucessos: {len(addresses)}")
-    print(f"Erros: {len(all_errors)}")
-    print(f"Tempo total: {elapsed:.2f}s")
-    print(f"Arquivo de erros gerado em: {errors_output_path}")
-    print(f"Banco utilizado: {settings.database_url}")
-    print(f"Arquivo JSON gerado em: {json_path}")
-    print(f"Arquivo XML gerado em: {xml_path}")
+    logger.info("Total de CEPs válidos carregados: %s", len(valid_ceps))
+    logger.info("Total de CEPs inválidos carregados: %s", len(invalid_rows))
+    logger.info("Total processado na amostra: %s", len(sample_ceps))
+    logger.info("Sucessos: %s", len(addresses))
+    logger.info("Erros: %s", len(all_errors))
+    logger.info("Tempo total: %.2fs", elapsed)
+    logger.info("Arquivo de erros gerado em: %s", errors_output_path)
+    logger.info("Banco utilizado: %s", settings.database_url)
+    logger.info("Arquivo JSON gerado em: %s", json_path)
+    logger.info("Arquivo XML gerado em: %s", xml_path)
 
     if addresses:
-        print(
-            f"Exemplo de sucesso: CEP={addresses[0].cep} | "
-            f"Localidade={addresses[0].localidade} | UF={addresses[0].uf}"
+        logger.info(
+            "Exemplo de sucesso: CEP=%s | Localidade=%s | UF=%s",
+            addresses[0].cep,
+            addresses[0].localidade,
+            addresses[0].uf,
         )
 
     if all_errors:
-        print(f"Exemplo de erro: {all_errors[0]}")
+        logger.info("Exemplo de erro: %s", all_errors[0])
 
 
 if __name__ == "__main__":
