@@ -139,3 +139,44 @@ LOG_LEVEL=DEBUG python -m src.main
 - Observabilidade (logs estruturados + métricas)
 - Execução distribuída (fila / workers)
 - Cache de CEPs já consultados
+
+
+## ☁️ Conhecimento em AWS (Glue e Lambda)
+
+### AWS Lambda
+
+O AWS Lambda é um serviço serverless que permite executar código sob demanda, sem necessidade de gerenciar servidores.
+
+É ideal para:
+- processamento orientado a eventos
+- tarefas de curta duração
+- execução paralela com escalabilidade automática
+
+No contexto deste projeto, o Lambda poderia ser utilizado para:
+- processar arquivos enviados para o S3
+- dividir o CSV em lotes menores
+- iniciar o processamento distribuído dos CEPs
+
+---
+
+### AWS Glue
+
+O AWS Glue é um serviço de ETL (Extract, Transform, Load) baseado em Apache Spark, utilizado para processamento de dados em larga escala.
+
+É mais indicado para:
+- processamento batch de grandes volumes de dados
+- pipelines analíticos
+- transformações complexas
+
+No contexto deste projeto, o Glue poderia ser utilizado para:
+- processar grandes volumes de CEPs diretamente a partir do S3
+- executar o pipeline de forma distribuída
+- integrar com data lakes ou bancos analíticos
+
+---
+
+### Considerações
+
+- Lambda é mais adequado para processamento orientado a eventos e workloads menores
+- Glue é mais indicado para processamento batch em larga escala
+- A escolha entre eles depende principalmente do volume de dados e do tipo de processamento necessário
