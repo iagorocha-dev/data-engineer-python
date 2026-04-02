@@ -123,24 +123,6 @@ Executar com debug:
 LOG_LEVEL=DEBUG python -m src.main
 ```
 
-## 📝 Observações
-
-- CEPs são validados em duas etapas:
-  - formato (validação local)
-  - existência (via API)
-- CEPs inexistentes são registrados como erro (not_found)
-- O processamento utiliza concorrência controlada para evitar sobrecarga da API ViaCEP
-- Durante os testes, foi observado bloqueio temporário ao realizar muitas requisições sem controle de concorrência, reforçando a importância do rate limiting
-- O uso de rate limiting e controle de concorrência resolve esse problema de forma segura
-
-
-## 🔧 Possíveis melhorias
-- Migração para PostgreSQL em ambiente produtivo
-- Observabilidade (logs estruturados + métricas)
-- Execução distribuída (fila / workers)
-- Cache de CEPs já consultados
-
-
 ## ☁️ Conhecimento em AWS (Glue e Lambda)
 
 ### AWS Lambda
@@ -180,3 +162,52 @@ No contexto deste projeto, o Glue poderia ser utilizado para:
 - Lambda é mais adequado para processamento orientado a eventos e workloads menores
 - Glue é mais indicado para processamento batch em larga escala
 - A escolha entre eles depende principalmente do volume de dados e do tipo de processamento necessário
+
+
+## 🧪 Testes
+
+O projeto possui testes automatizados utilizando pytest.
+
+Executar testes:
+```bash
+python -m pytest
+```
+
+Executar testes com cobertura:
+```bash
+python -m pytest --cov=src
+```
+
+Resultado atual
+- ✔️ 31 testes automatizados
+- ✔️ ~91% de cobertura
+
+Cobertura focada nos componentes críticos:
+- validação e normalização de CEP
+- leitura de dados (CSV)
+- integração com ViaCEP
+- tratamento de erros
+- persistência
+- exportação
+- controle de concorrência e rate limiting
+
+Arquivos de configuração e bootstrap foram excluídos da cobertura por não conterem lógica de negócio relevante.
+
+
+## 📝 Observações
+
+- CEPs são validados em duas etapas:
+  - formato (validação local)
+  - existência (via API)
+- CEPs inexistentes são registrados como erro (not_found)
+- O processamento utiliza concorrência controlada para evitar sobrecarga da API ViaCEP
+- Durante os testes, foi observado bloqueio temporário ao realizar muitas requisições sem controle de concorrência, reforçando a importância do rate limiting
+- O uso de rate limiting e controle de concorrência resolve esse problema de forma segura
+
+
+## 🔧 Possíveis melhorias
+- Uso de banco PostgreSQL em produção
+- Cache de CEPs já consultados
+- Execução distribuída (fila + workers)
+- Observabilidade com métricas
+- Deploy em ambiente cloud (AWS)
