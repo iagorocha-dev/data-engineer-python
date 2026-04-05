@@ -29,7 +29,7 @@ class Settings:
     )
 
     max_concurrency: int = int(
-        os.getenv("MAX_CONCURRENCY", "3")
+        os.getenv("MAX_CONCURRENCY", "5")
     )
 
     max_retries: int = int(
@@ -37,7 +37,7 @@ class Settings:
     )
 
     requests_per_second: int = int(
-        os.getenv("REQUESTS_PER_SECOND", "3")
+        os.getenv("REQUESTS_PER_SECOND", "5")
     )
 
     batch_pause_seconds: float = float(
@@ -45,7 +45,7 @@ class Settings:
     )
 
     batch_size: int = int(
-        os.getenv("BATCH_SIZE", "5")
+        os.getenv("BATCH_SIZE", "20")
     )
 
     log_level: str = os.getenv("LOG_LEVEL", "INFO").upper()
