@@ -13,6 +13,10 @@ def test_normalize_cep_left_pads_when_needed() -> None:
     assert normalize_cep("474177") == "00474177"
 
 
+def test_normalize_cep_returns_empty_string_for_none() -> None:
+    assert normalize_cep(None) == ""
+
+
 def test_is_valid_cep_returns_true_for_eight_digits() -> None:
     assert is_valid_cep("01310100") is True
 
