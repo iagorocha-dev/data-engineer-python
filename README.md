@@ -110,6 +110,89 @@ Para evitar sobrecarga da API ViaCEP, o pipeline aplica múltiplas estratégias:
 
 Essas estratégias garantem um consumo mais estável e reduzem o risco de bloqueio por IP.
 
+## 🚀 Performance e Resiliência em Escala
+
+Foi realizado um teste com 10.000 CEPs para validar o comportamento do pipeline em execução prolongada, considerando:
+
+- concorrência controlada
+- rate limiting
+- processamento incremental em batches
+- persistência contínua
+- interrupção segura em caso de indisponibilidade do serviço externo
+
+### ⚙️ Configuração utilizada
+
+- Batch size: 20
+- Concorrência máxima: 5
+- Rate limit: 5 req/s
+- Pausa entre batches: 1s
+- Retries: 2
+
+### 📈 Resultado observado
+
+A execução iniciou normalmente e manteve comportamento estável durante os batches iniciais, com throughput consistente e sem falhas sistêmicas.
+
+Após processamento prolongado, o serviço externo começou a degradar, levando a falhas de rede repetidas e aumento brusco no tempo de resposta de um batch.
+
+### 📊 Resultado parcial antes da interrupção segura
+
+```text
+attempted_now=3860
+success_now=79
+errors_now=3781
+total_time=762.55s
+```
+
+### ⚡ Comportamento do pipeline
+
+Situação estável nos batches saudáveis:
+
+```text
+duration ≈ 3.2s
+observed_throughput ≈ 6.1 ~ 6.2
+```
+
+Situação degradada no batch crítico:
+
+```text
+duration = 99.70s
+observed_throughput = 0.20
+success = 0
+errors = 20
+```
+
+### 🛑 Interrupção automática por indício de bloqueio / indisponibilidade
+
+Ao detectar um batch com falha sistêmica e throughput drasticamente reduzido, o pipeline interrompeu a execução de forma segura:
+
+```text
+Execução interrompida por indício de bloqueio ou indisponibilidade do ViaCEP
+batch=193/500
+remaining_after=6140
+blocked_batch_errors=20
+```
+
+### 🧠 O que esse teste comprova
+
+- ✔️ o pipeline suporta execução prolongada com milhares de registros
+- ✔️ a concorrência e o rate limiting funcionam de forma estável enquanto o serviço responde normalmente
+- ✔️ a persistência incremental preserva o progresso já realizado
+- ✔️ a execução não insiste indefinidamente em cenário de falha sistêmica
+- ✔️ a arquitetura permite retomada futura apenas dos CEPs pendentes
+
+### 🛡️ Estratégia adotada
+
+Como o ViaCEP é um serviço externo sujeito a indisponibilidade e possível limitação por uso prolongado, a solução foi desenhada para:
+
+- respeitar limites de consumo
+- processar em lotes pequenos e previsíveis
+- persistir progresso continuamente
+- interromper a execução quando houver forte indício de bloqueio ou degradação do serviço
+
+### 🎯 Resumo técnico
+
+O pipeline foi projetado para maximizar throughput respeitando limites externos, combinando concorrência assíncrona, rate limiting, processamento incremental e interrupção segura em caso de indisponibilidade.
+
 ## 🪵 Logging
 
 O projeto utiliza o módulo padrão logging do Python.
@@ -179,19 +262,8 @@ python -m pytest --cov=src
 ```
 
 Resultado atual
-- ✔️ 31 testes automatizados
-- ✔️ ~91% de cobertura
-
-Cobertura focada nos componentes críticos:
-- validação e normalização de CEP
-- leitura de dados (CSV)
-- integração com ViaCEP
-- tratamento de erros
-- persistência
-- exportação
-- controle de concorrência e rate limiting
-
-Arquivos de configuração e bootstrap foram excluídos da cobertura por não conterem lógica de negócio relevante.
+- ✔️ 53 testes automatizados
+- ✔️ ~99% de cobertura
 
 
 ## 📝 Observações

@@ -19,7 +19,7 @@ def calculate_backoff(attempt: int) -> float:
     Calcula o tempo de espera entre tentativas.
     Estratégia simples de backoff exponencial.
     """
-    return 0.3 * (2 ** attempt)
+    return 0.3 * (2**attempt)
 
 
 class AsyncRateLimiter:
@@ -27,10 +27,10 @@ class AsyncRateLimiter:
     Rate limiter simples por janela deslizante.
 
     Exemplo:
-    - max_calls=3
+    - max_calls=5
     - period_seconds=1.0
 
-    Garante no máximo 3 liberações por segundo.
+    Garante no máximo 5 liberações por segundo.
     """
 
     def __init__(self, max_calls: int, period_seconds: float = 1.0):
@@ -244,14 +244,20 @@ async def fetch_all_ceps(
             batch = ceps[start : start + batch_size]
 
             logger.info(
-                "Iniciando batch %s/%s | size=%s",
+                "Batch técnico %s/%s iniciado | size=%s | max_concurrency=%s | rps_limit=%s | batch_pause=%.2fs",
                 batch_index,
                 total_batches,
                 len(batch),
+                max_concurrency,
+                requests_per_second,
+                batch_pause_seconds,
             )
+
+            batch_start = time.perf_counter()
 
             results = await asyncio.gather(*(worker(cep) for cep in batch))
 
+            batch_elapsed = time.perf_counter() - batch_start
             batch_success = 0
             batch_errors = 0
 
@@ -263,12 +269,17 @@ async def fetch_all_ceps(
                     errors.append(error)
                     batch_errors += 1
 
+            observed_throughput = len(batch) / batch_elapsed if batch_elapsed > 0 else 0.0
+
             logger.info(
-                "Finalizando batch %s/%s | success=%s | errors=%s",
+                "Batch técnico %s/%s finalizado | size=%s | success=%s | errors=%s | duration=%.2fs | observed_throughput=%.2f",
                 batch_index,
                 total_batches,
+                len(batch),
                 batch_success,
                 batch_errors,
+                batch_elapsed,
+                observed_throughput,
             )
 
             if batch_index < total_batches:

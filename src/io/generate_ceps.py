@@ -41,6 +41,13 @@ def generate_random_unique_ceps(total: int, excluded: set[str]) -> list[str]:
     return list(generated)
 
 
+def generate_unique_ceps(total: int) -> list[str]:
+    """
+    Mantém a API pública usada pelos testes e por chamadas externas.
+    """
+    return generate_random_unique_ceps(total, excluded=set())
+
+
 def build_cep_dataset(total: int) -> list[str]:
     """
     Monta a lista final de CEPs garantindo que os CEPs conhecidos
